@@ -3,5 +3,11 @@ main = "./workers/gif-worker.js"
 compatibility_date = "2023-10-26"
 compatibility_flags = ["nodejs_compat"]
 
+# R2 Bucket Bindings
+[[r2_buckets]]
+binding = "gif-converter"            # Worker 中使用的绑定名称
+bucket_name = "gif-converter"       # 你的 R2 存储桶名称
+preview_bucket_name = "gif-worker"
+
 [site]
 bucket = "./out"
