@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
@@ -6,6 +6,48 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [debug, setDebug] = useState(null);
   const [imageStats, setImageStats] = useState(null);
+  const [images, setImages] = useState([]);
+  const [isLoadingImages, setIsLoadingImages] = useState(false);
+
+  // 获取所有图片
+  const fetchImages = async () => {
+    try {
+      setIsLoadingImages(true);
+      setError(null);
+
+      const response = await fetch(
+        "https://gif-converter.lijinhai255.workers.dev/api/images",
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Server error: ${response.status}`);
+      }
+
+      if (data.success && data.images) {
+        setImages(data.images);
+      } else {
+        throw new Error("Invalid response format");
+      }
+    } catch (error) {
+      console.error("Error fetching images:", error);
+      setError(error.message);
+    } finally {
+      setIsLoadingImages(false);
+    }
+  };
+
+  // 组件加载时获取图片
+  useEffect(() => {
+    fetchImages();
+  }, []);
 
   const convertImage = async () => {
     try {
@@ -14,8 +56,6 @@ export default function Home() {
       setDebug(null);
       setImageStats(null);
       setImageUrl(null);
-
-      console.log("Sending request...");
 
       const response = await fetch(
         "https://gif-converter.lijinhai255.workers.dev/api/gif-converter",
@@ -27,10 +67,7 @@ export default function Home() {
         }
       );
 
-      console.log("Response status:", response.status);
-
       const data = await response.json();
-      console.log("Response data:", data);
 
       if (!response.ok) {
         setDebug(data.debug || {});
@@ -38,22 +75,19 @@ export default function Home() {
       }
 
       if (data.success && data.image) {
-        // 验证图片数据
         if (!data.image.startsWith("data:image/gif;base64,")) {
           throw new Error("Invalid image data format");
         }
 
-        // 计算图片统计信息
         setImageStats({
           format: "GIF",
-          size: Math.round(data.image.length * 0.75), // base64 到实际大小的估算
+          size: Math.round(data.image.length * 0.75),
           dimensions: "1x1 px (scaled to 100x100)",
         });
 
         setImageUrl(data.image);
         setDebug(data.debug || {});
 
-        // 预加载图片
         await new Promise((resolve, reject) => {
           const img = new Image();
           img.onload = resolve;
@@ -75,15 +109,45 @@ export default function Home() {
     <div className="p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">Image Converter Test</h1>
 
+      {/* 原始图片展示区域 */}
+      <div className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Original Images:</h2>
+        {isLoadingImages ? (
+          <div className="text-gray-600">Loading images...</div>
+        ) : (
+          <div className="grid grid-cols-3 gap-4">
+            {images.map((image, index) => (
+              <div
+                key={image.name}
+                className="p-4 bg-white border-2 border-gray-200 rounded-lg"
+              >
+                <div className="bg-gray-100 p-2 rounded-md">
+                  <img
+                    src={image.url}
+                    alt={`Original ${index + 1}`}
+                    className="w-full h-32 object-contain border border-gray-300"
+                  />
+                </div>
+                <div className="mt-2 text-sm text-center text-gray-600">
+                  {image.name}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 转换按钮 */}
       <button
         onClick={convertImage}
         disabled={isLoading}
         className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg mb-6 
                    disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
       >
-        {isLoading ? "Processing..." : "Test Conversion"}
+        {isLoading ? "Processing..." : "Convert to GIF"}
       </button>
 
+      {/* 错误提示 */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
           <div className="font-semibold text-red-600">Error:</div>
@@ -91,6 +155,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* 调试信息 */}
       {debug && (
         <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
           <div className="font-semibold mb-2">Debug Info:</div>
@@ -100,9 +165,10 @@ export default function Home() {
         </div>
       )}
 
+      {/* 转换后的GIF展示 */}
       {imageUrl && (
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold">Processed Image:</h2>
+          <h2 className="text-2xl font-semibold">Converted GIF:</h2>
 
           {imageStats && (
             <div className="mb-4 text-sm text-gray-600">
