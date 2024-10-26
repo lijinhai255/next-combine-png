@@ -1,6 +1,5 @@
-// pages/index.js
-import { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 
 export default function Home() {
   const [images, setImages] = useState([]);
@@ -11,7 +10,7 @@ export default function Home() {
   const [gifUrl, setGifUrl] = useState(null);
   const [gifSettings, setGifSettings] = useState({
     delay: 500,
-    quality: 80
+    quality: 80,
   });
 
   // 获取图片列表
@@ -19,14 +18,14 @@ export default function Home() {
     try {
       setIsLoading(true);
       setError(null);
-      
-      const response = await fetch('/api/images');
+
+      const response = await fetch("/api/images");
       const data = await response.json();
-      
+
       if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch images');
+        throw new Error(data.error || "Failed to fetch images");
       }
-      
+
       setImages(data.images);
     } catch (err) {
       setError(err.message);
@@ -46,23 +45,21 @@ export default function Home() {
 
       for (const file of files) {
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append("file", file);
 
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
         });
 
         const data = await response.json();
 
         if (!data.success) {
-          throw new Error(data.error || 'Upload failed');
+          throw new Error(data.error || "Upload failed");
         }
       }
 
-      // 刷新图片列表
       await fetchImages();
-
     } catch (err) {
       setError(err.message);
     } finally {
@@ -74,21 +71,17 @@ export default function Home() {
   const handleDelete = async (imageId) => {
     try {
       const response = await fetch(`/api/images/${imageId}`, {
-        method: 'DELETE'
+        method: "DELETE",
       });
 
       const data = await response.json();
 
       if (!data.success) {
-        throw new Error(data.error || 'Failed to delete image');
+        throw new Error(data.error || "Failed to delete image");
       }
 
-      // 从选中列表中移除
-      setSelectedImages(prev => prev.filter(id => id !== imageId));
-      
-      // 刷新图片列表
+      setSelectedImages((prev) => prev.filter((id) => id !== imageId));
       await fetchImages();
-
     } catch (err) {
       setError(err.message);
     }
@@ -96,9 +89,9 @@ export default function Home() {
 
   // 切换图片选择
   const toggleImageSelection = (imageId) => {
-    setSelectedImages(prev => {
+    setSelectedImages((prev) => {
       if (prev.includes(imageId)) {
-        return prev.filter(id => id !== imageId);
+        return prev.filter((id) => id !== imageId);
       } else {
         return [...prev, imageId];
       }
@@ -109,32 +102,31 @@ export default function Home() {
   const createGif = async () => {
     try {
       if (selectedImages.length < 2) {
-        throw new Error('Please select at least 2 images');
+        throw new Error("Please select at least 2 images");
       }
 
       setIsLoading(true);
       setError(null);
       setGifUrl(null);
 
-      const response = await fetch('/api/create-gif', {
-        method: 'POST',
+      const response = await fetch("/api/create-gif", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           imageIds: selectedImages,
-          ...gifSettings
-        })
+          ...gifSettings,
+        }),
       });
 
       const data = await response.json();
 
       if (!data.success) {
-        throw new Error(data.error || 'Failed to create GIF');
+        throw new Error(data.error || "Failed to create GIF");
       }
 
       setGifUrl(data.gifUrl);
-
     } catch (err) {
       setError(err.message);
     } finally {
@@ -156,12 +148,7 @@ export default function Home() {
           <span className="sr-only">Choose files</span>
           <input
             type="file"
-            className="block w-full text-sm text-gray-500
-              file:mr-4 file:py-2 file:px-4
-              file:rounded-full file:border-0
-              file:text-sm file:font-semibold
-              file:bg-blue-50 file:text-blue-700
-              hover:file:bg-blue-100"
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             onChange={handleUpload}
             accept="image/*"
             multiple
@@ -186,7 +173,12 @@ export default function Home() {
               <input
                 type="number"
                 value={gifSettings.delay}
-                onChange={(e) => setGifSettings(prev => ({...prev, delay: Number(e.target.value)}))}
+                onChange={(e) =>
+                  setGifSettings((prev) => ({
+                    ...prev,
+                    delay: Number(e.target.value),
+                  }))
+                }
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                 min="100"
                 max="3000"
@@ -199,7 +191,12 @@ export default function Home() {
               <input
                 type="number"
                 value={gifSettings.quality}
-                onChange={(e) => setGifSettings(prev => ({...prev, quality: Number(e.target.value)}))}
+                onChange={(e) =>
+                  setGifSettings((prev) => ({
+                    ...prev,
+                    quality: Number(e.target.value),
+                  }))
+                }
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                 min="1"
                 max="100"
@@ -221,7 +218,7 @@ export default function Home() {
             Creating GIF...
           </>
         ) : (
-          'Create GIF'
+          "Create GIF"
         )}
       </button>
 
@@ -232,15 +229,25 @@ export default function Home() {
             <div
               className={`absolute inset-0 ${
                 selectedImages.includes(image.id)
-                  ? 'bg-blue-500 bg-opacity-50'
-                  : 'bg-black bg-opacity-0 group-hover:bg-opacity-30'
+                  ? "bg-blue-500 bg-opacity-50"
+                  : "bg-black bg-opacity-0 group-hover:bg-opacity-30"
               } transition-all duration-300 rounded-lg`}
               onClick={() => toggleImageSelection(image.id)}
             >
               {selectedImages.includes(image.id) && (
                 <div className="absolute top-2 right-2 bg-blue-500 rounded-full p-1">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  <svg
+                    className="w-4 h-4 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 </div>
               )}
@@ -249,3 +256,59 @@ export default function Home() {
               src={image.url}
               alt={image.filename}
               className="w-full aspect-square object-cover rounded-lg cursor-pointer"
+            />
+            <button
+              onClick={() => handleDelete(image.id)}
+              className="absolute bottom-2 right-2 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* 生成的 GIF */}
+      {gifUrl && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold mb-4">Generated GIF</h2>
+          <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+            <img
+              src={gifUrl}
+              alt="Generated GIF"
+              className="max-w-full mx-auto"
+            />
+            <div className="mt-4 flex justify-center">
+              <a
+                href={gifUrl}
+                download="animated.gif"
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              >
+                Download GIF
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 错误显示 */}
+      {error && (
+        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="font-semibold text-red-600">Error:</div>
+          <div className="text-red-700">{error}</div>
+        </div>
+      )}
+    </div>
+  );
+}

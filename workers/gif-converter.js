@@ -1,7 +1,7 @@
 import { Router } from "itty-router";
 
 const router = Router();
-const CLOUDFLARE_ACCOUNT_ID = "your-account-id"; // 替换为你的账号ID
+const CLOUDFLARE_ACCOUNT_ID = "ef96fca5011eaac8a774fcea0a71a67e"; // 替换为你的账号ID
 const API_TOKEN = "RY1ZaXwiKjk2YVRB2-MYXbEIY3woB_nw-VotPGKK";
 
 const corsHeaders = {

@@ -1,12 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "export",
-  images: {
-    unoptimized: true,
+  reactStrictMode: true,
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "https://gif-converter.lijinhai255.workers.dev/api/:path*",
+      },
+    ];
   },
-  trailingSlash: true,
-  basePath: "",
-  assetPrefix: "",
 };
 
 module.exports = nextConfig;
