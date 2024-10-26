@@ -1,10 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "export", // 改为静态导出
+  output: "export",
   images: {
     unoptimized: true,
   },
   trailingSlash: true,
+  basePath: "",
+  assetPrefix: "",
 };
 
 module.exports = nextConfig;
