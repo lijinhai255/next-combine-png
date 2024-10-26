@@ -14,16 +14,15 @@ export default function Home() {
       setIsLoadingImages(true);
       setError(null);
 
-      const response = await fetch(
-        "https://gif-converter.lijinhai255.workers.dev/api/images",
-        {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
-
+      const response = await fetch("your-worker-url/api/create-gif")
+        .then((response) => response.blob())
+        .then((blob) => {
+          const url = URL.createObjectURL(blob);
+          // 显示GIF
+          const img = document.createElement("img");
+          img.src = url;
+          document.body.appendChild(img);
+        });
       const data = await response.json();
 
       if (!response.ok) {

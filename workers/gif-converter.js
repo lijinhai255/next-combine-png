@@ -1,4 +1,5 @@
 import { Router } from "itty-router";
+import { GIF } from "gifenc";
 
 const router = Router();
 
@@ -8,107 +9,60 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Accept",
 };
 
-// 获取单个图片
-router.get("/api/images/:filename", async (request, { env }) => {
+// 创建GIF
+router.get("/api/create-gif", async (request, { env }) => {
   try {
     if (!env?.MY_BUCKET) {
       throw new Error("R2 bucket not configured");
     }
 
-    const { filename } = request.params;
-    const imagePath = `public/${filename}`;
-
-    const object = await env.MY_BUCKET.get(imagePath);
-    if (!object) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Image not found",
-        }),
-        {
-          status: 404,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
-    }
-
-    // 获取图片数据并转换为base64
-    const arrayBuffer = await object.arrayBuffer();
-    const base64Data = btoa(
-      String.fromCharCode.apply(null, new Uint8Array(arrayBuffer))
-    );
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        image: `data:${object.httpMetadata.contentType};base64,${base64Data}`,
-      }),
-      {
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
-      }
-    );
-  } catch (error) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-      }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
-      }
-    );
-  }
-});
-
-// 获取所有图片
-router.get("/api/images", async (request, { env }) => {
-  try {
-    if (!env?.MY_BUCKET) {
-      throw new Error("R2 bucket not configured");
-    }
-
-    const imageNames = ["image1.png", "image2.png", "image3.png"];
+    // 列出所有图片
+    const listed = await env.MY_BUCKET.list({ prefix: "public/" });
     const images = [];
 
-    for (const filename of imageNames) {
-      const imagePath = `public/${filename}`;
-      const object = await env.MY_BUCKET.get(imagePath);
-
-      if (object) {
-        const arrayBuffer = await object.arrayBuffer();
-        const base64Data = btoa(
-          String.fromCharCode.apply(null, new Uint8Array(arrayBuffer))
-        );
-
+    // 获取所有图片数据
+    for (const object of listed.objects) {
+      const imageObject = await env.MY_BUCKET.get(object.key);
+      if (imageObject) {
+        const arrayBuffer = await imageObject.arrayBuffer();
+        const response = new Response(arrayBuffer);
+        const blob = await response.blob();
         images.push({
-          name: filename,
-          url: `data:${object.httpMetadata.contentType};base64,${base64Data}`,
+          data: blob,
+          delay: 500, // 每帧延迟500ms
         });
       }
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        images,
-      }),
-      {
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
-      }
-    );
+    // 创建GIF编码器
+    const gif = GIF.create({
+      width: 800, // GIF宽度
+      height: 600, // GIF高度
+      quality: 10, // 质量
+      repeat: 0, // 循环次数 (0 = 无限循环)
+    });
+
+    // 添加每一帧
+    for (const image of images) {
+      const imageData = await createImageBitmap(image.data);
+      const canvas = new OffscreenCanvas(800, 600);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(imageData, 0, 0, 800, 600);
+      const frameData = ctx.getImageData(0, 0, 800, 600);
+
+      gif.addFrame(frameData.data, { delay: image.delay });
+    }
+
+    // 完成GIF编码
+    const gifData = gif.finish();
+
+    // 返回GIF数据
+    return new Response(gifData, {
+      headers: {
+        "Content-Type": "image/gif",
+        ...corsHeaders,
+      },
+    });
   } catch (error) {
     return new Response(
       JSON.stringify({
@@ -135,7 +89,6 @@ router.options("*", () => {
   });
 });
 
-// 添加 fetch 事件处理程序
 export default {
   async fetch(request, env, ctx) {
     return router.handle(request, { env, ctx });
