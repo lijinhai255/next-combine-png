@@ -1,16 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [imageUrl, setImageUrl] = useState(null);
   const [error, setError] = useState(null);
   const [debug, setDebug] = useState(null);
+  const [imageStats, setImageStats] = useState(null);
 
   const convertImage = async () => {
     try {
       setIsLoading(true);
       setError(null);
       setDebug(null);
+      setImageStats(null);
       setImageUrl(null);
 
       console.log("Sending request...");
@@ -36,22 +38,28 @@ export default function Home() {
       }
 
       if (data.success && data.image) {
-        // 验证 base64 数据
-        if (!data.image.startsWith("data:image/")) {
+        // 验证图片数据
+        if (!data.image.startsWith("data:image/gif;base64,")) {
           throw new Error("Invalid image data format");
         }
+
+        // 计算图片统计信息
+        setImageStats({
+          format: "GIF",
+          size: Math.round(data.image.length * 0.75), // base64 到实际大小的估算
+          dimensions: "1x1 px (scaled to 100x100)",
+        });
 
         setImageUrl(data.image);
         setDebug(data.debug || {});
 
         // 预加载图片
-        const img = new Image();
-        img.onload = () => console.log("Image loaded successfully");
-        img.onerror = (e) => {
-          console.error("Image load error:", e);
-          setError("Failed to load image: Invalid image data");
-        };
-        img.src = data.image;
+        await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = data.image;
+        });
       } else {
         throw new Error("Invalid response format");
       }
@@ -64,47 +72,68 @@ export default function Home() {
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Image Converter Test</h1>
+    <div className="p-8 max-w-3xl mx-auto">
+      <h1 className="text-3xl font-bold mb-6">Image Converter Test</h1>
 
       <button
         onClick={convertImage}
         disabled={isLoading}
-        className="bg-blue-500 text-white px-4 py-2 rounded mb-4 disabled:bg-gray-400"
+        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg mb-6 
+                   disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
       >
         {isLoading ? "Processing..." : "Test Conversion"}
       </button>
 
       {error && (
-        <div className="text-red-500 mb-4 p-4 bg-red-50 rounded">
-          <div className="font-bold">Error:</div>
-          <div>{error}</div>
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="font-semibold text-red-600">Error:</div>
+          <div className="text-red-700">{error}</div>
         </div>
       )}
 
       {debug && (
-        <div className="mb-4 p-4 bg-gray-50 rounded">
-          <div className="font-bold">Debug Info:</div>
-          <pre className="whitespace-pre-wrap">
+        <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="font-semibold mb-2">Debug Info:</div>
+          <pre className="whitespace-pre-wrap text-sm text-gray-700">
             {JSON.stringify(debug, null, 2)}
           </pre>
         </div>
       )}
 
       {imageUrl && (
-        <div>
-          <h2 className="text-xl font-bold mb-2">Processed Image:</h2>
-          <div className="border-2 border-gray-300 rounded p-4 bg-white">
-            <img
-              src={imageUrl}
-              alt="Processed"
-              className="border border-gray-200"
-              style={{
-                imageRendering: "pixelated",
-                width: "100px",
-                height: "100px",
-              }}
-            />
+        <div className="space-y-4">
+          <h2 className="text-2xl font-semibold">Processed Image:</h2>
+
+          {imageStats && (
+            <div className="mb-4 text-sm text-gray-600">
+              <div>Format: {imageStats.format}</div>
+              <div>Size: {imageStats.size} bytes</div>
+              <div>Dimensions: {imageStats.dimensions}</div>
+            </div>
+          )}
+
+          <div className="p-4 bg-white border-2 border-gray-200 rounded-lg inline-block">
+            <div className="bg-gray-100 p-2 rounded-md">
+              <img
+                src={imageUrl}
+                alt="Processed"
+                className="border border-gray-300"
+                style={{
+                  imageRendering: "pixelated",
+                  width: "100px",
+                  height: "100px",
+                  backgroundColor: "white",
+                  boxShadow: "0 0 10px rgba(0,0,0,0.1)",
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="font-semibold mb-2">Image Data URL:</div>
+            <div className="text-xs text-gray-600 break-all font-mono">
+              {imageUrl.substring(0, 100)}...
+            </div>
           </div>
         </div>
       )}
