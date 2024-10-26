@@ -18,7 +18,7 @@ export default function Home() {
       }
 
       const response = await fetch(
-        "https://your-worker.workers.dev/api/create-gif",
+        "https://gif-converter.lijinhai255.workers.dev/api/create-gif",
         {
           method: "POST",
           body: formData,
@@ -30,7 +30,9 @@ export default function Home() {
       }
 
       const data = await response.json();
-      setGifUrl(`https://your-worker.workers.dev/gif/${data.gifId}`);
+      setGifUrl(
+        `https://gif-converter.lijinhai255.workers.dev/gif/${data.gifId}`
+      );
     } catch (error) {
       console.error("Error:", error);
     } finally {
