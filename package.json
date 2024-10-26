@@ -6,12 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "export": "next build && next export"  
+    "deploy:worker": "wrangler publish"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.44",
+    "gif-encoder-2": "^1.0.5",
+    "itty-router": "^3.0.12",
     "next": "13.4.19",
     "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "gif.js": "^0.2.0"
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
   }
 }

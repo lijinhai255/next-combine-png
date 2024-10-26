@@ -1,42 +1,38 @@
-// pages/index.js
 import { useState } from "react";
-
-const images = ["/image1.png", "/image2.png", "/image3.png"];
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [gifUrl, setGifUrl] = useState(null);
 
   const createGif = async () => {
     try {
       setIsLoading(true);
-      setError(null);
 
-      const response = await fetch("/api/create-gif", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({}),
-      });
+      const formData = new FormData();
 
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Server returned non-JSON response");
+      // 添加图片到 FormData
+      for (let i = 1; i <= 3; i++) {
+        const response = await fetch(`/image${i}.png`);
+        const blob = await response.blob();
+        formData.append("images", blob);
+      }
+
+      const response = await fetch(
+        "https://your-worker.workers.dev/api/create-gif",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to create GIF");
       }
 
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create GIF");
-      }
-
-      // 添加时间戳来避免缓存
-      setGifUrl(`/output.gif?t=${new Date().getTime()}`);
+      setGifUrl(`https://your-worker.workers.dev/gif/${data.gifId}`);
     } catch (error) {
       console.error("Error:", error);
-      setError(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -49,28 +45,21 @@ export default function Home() {
       <button
         onClick={createGif}
         disabled={isLoading}
-        className="bg-blue-500 text-white px-4 py-2 rounded mb-4 disabled:opacity-50 hover:bg-blue-600"
+        className="bg-blue-500 text-white px-4 py-2 rounded mb-4"
       >
         {isLoading ? "Creating..." : "Create GIF"}
       </button>
 
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
-
-      <div className="mb-6">
-        <h2 className="text-xl font-bold mb-2">Original PNGs:</h2>
-        <div className="flex gap-4 flex-wrap">
-          {images.map((img, index) => (
-            <div key={index} className="border p-2 rounded">
-              <img
-                src={img}
-                alt={`Image ${index + 1}`}
-                className="w-48 h-48 object-cover"
-              />
-            </div>
+      <div className="mb-4">
+        <h2 className="text-xl font-bold mb-2">Original Images:</h2>
+        <div className="flex gap-2">
+          {[1, 2, 3].map((num) => (
+            <img
+              key={num}
+              src={`/image${num}.png`}
+              alt={`Image ${num}`}
+              className="w-48 object-cover"
+            />
           ))}
         </div>
       </div>
@@ -78,9 +67,7 @@ export default function Home() {
       {gifUrl && (
         <div>
           <h2 className="text-xl font-bold mb-2">Generated GIF:</h2>
-          <div className="border p-2 rounded inline-block">
-            <img src={gifUrl} alt="Generated GIF" className="w-96 h-auto" />
-          </div>
+          <img src={gifUrl} alt="Generated GIF" className="w-96" />
         </div>
       )}
     </div>
