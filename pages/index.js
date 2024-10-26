@@ -2,20 +2,18 @@ import { useState } from "react";
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
-  const [gifUrl, setGifUrl] = useState(null);
+  const [imageUrl, setImageUrl] = useState(null);
   const [error, setError] = useState(null);
   const [debug, setDebug] = useState(null);
 
-  const createGif = async () => {
+  const convertImage = async () => {
     try {
       setIsLoading(true);
       setError(null);
       setDebug(null);
 
-      // 创建测试用的 Blob
+      // 创建测试数据
       const testBlob = new Blob(["test data"], { type: "image/png" });
-
-      // 使用单个测试图片
       const formData = new FormData();
       formData.append("image", testBlob, "test.png");
 
@@ -25,9 +23,6 @@ export default function Home() {
         "https://gif-converter.lijinhai255.workers.dev/api/gif-converter",
         {
           method: "POST",
-          headers: {
-            Accept: "application/json",
-          },
           body: formData,
         }
       );
@@ -43,13 +38,13 @@ export default function Home() {
       }
 
       if (data.success && data.image) {
-        setGifUrl(data.image);
+        setImageUrl(data.image);
         setDebug(data.debug || {});
       } else {
         throw new Error("Invalid response format");
       }
     } catch (error) {
-      console.error("Error creating GIF:", error);
+      console.error("Error:", error);
       setError(error.message);
     } finally {
       setIsLoading(false);
@@ -61,7 +56,7 @@ export default function Home() {
       <h1 className="text-2xl font-bold mb-4">Image Converter Test</h1>
 
       <button
-        onClick={createGif}
+        onClick={convertImage}
         disabled={isLoading}
         className="bg-blue-500 text-white px-4 py-2 rounded mb-4 disabled:bg-gray-400"
       >
@@ -84,10 +79,10 @@ export default function Home() {
         </div>
       )}
 
-      {gifUrl && (
+      {imageUrl && (
         <div>
           <h2 className="text-xl font-bold mb-2">Processed Image:</h2>
-          <img src={gifUrl} alt="Processed" className="w-96" />
+          <img src={imageUrl} alt="Processed" className="w-96" />
         </div>
       )}
     </div>

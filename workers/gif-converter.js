@@ -8,6 +8,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Accept",
 };
 
+// 安全的将 ArrayBuffer 转换为 Base64
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 1024;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.slice(i, i + chunkSize);
+    chunk.forEach((byte) => (binary += String.fromCharCode(byte)));
+  }
+  return btoa(binary);
+}
+
 const app = {
   fetch: async (request, env, ctx) => {
     return router.handle(request, { env, ctx }).catch((error) => {
@@ -17,10 +29,6 @@ const app = {
           success: false,
           error: "Internal Server Error",
           details: error.message,
-          debug: {
-            errorType: error.constructor.name,
-            stack: error.stack,
-          },
         }),
         {
           status: 500,
@@ -38,37 +46,31 @@ router.post("/api/gif-converter", async (request, { env }) => {
   try {
     console.log("Starting image processing");
 
-    // 验证环境
     if (!env?.MY_BUCKET) {
       throw new Error("R2 bucket not configured");
     }
 
-    // 解析请求
     const contentType = request.headers.get("content-type") || "";
     console.log("Content-Type:", contentType);
 
-    // 确保是 multipart/form-data
     if (!contentType.includes("multipart/form-data")) {
       throw new Error("Invalid content type. Expected multipart/form-data");
     }
 
-    // 解析表单数据
     const formData = await request.formData();
     console.log("Form data parsed");
 
-    // 获取图片文件
     const image = formData.get("image");
     if (!image) {
       throw new Error("No image found in request");
     }
 
-    console.log("Image found:", {
+    console.log("Image info:", {
       type: image.type,
       size: image.size,
       name: image.name,
     });
 
-    // 读取图片数据
     const imageData = await image.arrayBuffer();
     console.log("Image data read, size:", imageData.byteLength);
 
@@ -81,10 +83,13 @@ router.post("/api/gif-converter", async (request, { env }) => {
     });
     console.log("Image saved to R2");
 
-    // 返回成功响应
+    // 转换为 base64 并返回正确格式的响应
+    const base64Data = arrayBufferToBase64(imageData);
+
     return new Response(
       JSON.stringify({
         success: true,
+        image: `data:${image.type || "image/png"};base64,${base64Data}`,
         debug: {
           imageInfo: {
             type: image.type,
@@ -112,9 +117,8 @@ router.post("/api/gif-converter", async (request, { env }) => {
         debug: {
           timestamp: new Date().toISOString(),
           errorType: error.constructor.name,
-          stack: error.stack,
           requestMethod: request.method,
-          requestHeaders: Object.fromEntries(request.headers),
+          contentType: request.headers.get("content-type"),
         },
       }),
       {
