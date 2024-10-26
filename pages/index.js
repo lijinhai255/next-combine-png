@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
@@ -11,6 +11,7 @@ export default function Home() {
       setIsLoading(true);
       setError(null);
       setDebug(null);
+      setImageUrl(null);
 
       console.log("Sending request...");
 
@@ -35,8 +36,22 @@ export default function Home() {
       }
 
       if (data.success && data.image) {
+        // 验证 base64 数据
+        if (!data.image.startsWith("data:image/")) {
+          throw new Error("Invalid image data format");
+        }
+
         setImageUrl(data.image);
         setDebug(data.debug || {});
+
+        // 预加载图片
+        const img = new Image();
+        img.onload = () => console.log("Image loaded successfully");
+        img.onerror = (e) => {
+          console.error("Image load error:", e);
+          setError("Failed to load image: Invalid image data");
+        };
+        img.src = data.image;
       } else {
         throw new Error("Invalid response format");
       }
@@ -79,28 +94,18 @@ export default function Home() {
       {imageUrl && (
         <div>
           <h2 className="text-xl font-bold mb-2">Processed Image:</h2>
-          <img
-            src={imageUrl}
-            alt="Processed"
-            className="w-96 border-2 border-gray-300 rounded"
-            style={{
-              imageRendering: "pixelated",
-              width: "100px",
-              height: "100px",
-              backgroundColor: "#f0f0f0",
-            }}
-            onError={(e) => {
-              console.error("Image load error:", e);
-              setError("Failed to load processed image");
-            }}
-          />
-        </div>
-      )}
-
-      {imageUrl && (
-        <div className="mt-4">
-          <div className="font-bold">Image URL:</div>
-          <div className="break-all bg-gray-50 p-2 rounded">{imageUrl}</div>
+          <div className="border-2 border-gray-300 rounded p-4 bg-white">
+            <img
+              src={imageUrl}
+              alt="Processed"
+              className="border border-gray-200"
+              style={{
+                imageRendering: "pixelated",
+                width: "100px",
+                height: "100px",
+              }}
+            />
+          </div>
         </div>
       )}
     </div>
