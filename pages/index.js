@@ -8,7 +8,6 @@ import {
   Trash2,
   Settings,
 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Home() {
   const [images, setImages] = useState([]);
@@ -273,7 +272,7 @@ export default function Home() {
                     ),
                   }))
                 }
-                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 min="100"
                 max="3000"
               />
@@ -291,7 +290,7 @@ export default function Home() {
                     quality: Math.min(100, Math.max(1, Number(e.target.value))),
                   }))
                 }
-                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 min="1"
                 max="100"
               />
@@ -379,9 +378,9 @@ export default function Home() {
 
       {/* Error Display */}
       {error && (
-        <Alert variant="destructive" className="mt-4">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
       )}
     </div>
   );
