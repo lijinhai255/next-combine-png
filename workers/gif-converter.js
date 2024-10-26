@@ -1,115 +1,161 @@
-import { useState } from "react";
+import { Router } from "itty-router";
 
-export default function Home() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [imageUrl, setImageUrl] = useState(null);
-  const [error, setError] = useState(null);
-  const [debug, setDebug] = useState(null);
+const router = Router();
 
-  const convertImage = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setDebug(null);
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Accept",
+};
 
-      // 创建一个 1x1 像素的红色 PNG 图片数据
-      const canvas = document.createElement("canvas");
-      canvas.width = 100;
-      canvas.height = 100;
-      const ctx = canvas.getContext("2d");
+// 创建一个简单的 1x1 像素的测试图片数据
+function createTestImageData() {
+  // GIF 文件头
+  const header = new Uint8Array([
+    0x47,
+    0x49,
+    0x46,
+    0x38,
+    0x39,
+    0x61, // GIF89a
+    0x01,
+    0x00,
+    0x01,
+    0x00, // width=1, height=1
+    0x80,
+    0x00,
+    0x00, // GCT=2 entries
+    0xff,
+    0x00,
+    0x00, // red
+    0x00,
+    0x00,
+    0x00, // black
+    0x21,
+    0xf9,
+    0x04, // Graphic Control Extension
+    0x00,
+    0x00,
+    0x00,
+    0x00, // no delay, no transparent color
+    0x2c,
+    0x00,
+    0x00,
+    0x00,
+    0x00, // Image Descriptor
+    0x01,
+    0x00,
+    0x01,
+    0x00,
+    0x00, // 1x1 pixels, no local color table
+    0x02,
+    0x02,
+    0x44,
+    0x01,
+    0x00, // LZW min code size=2, 1 byte of data, block terminator
+  ]);
 
-      // 绘制渐变背景
-      const gradient = ctx.createLinearGradient(0, 0, 100, 100);
-      gradient.addColorStop(0, "red");
-      gradient.addColorStop(0.5, "green");
-      gradient.addColorStop(1, "blue");
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 100, 100);
+  return header;
+}
 
-      // 转换为 blob
-      const blob = await new Promise((resolve) =>
-        canvas.toBlob(resolve, "image/png")
-      );
-
-      const formData = new FormData();
-      formData.append("image", blob, "test.png");
-
-      console.log("Sending request with image size:", blob.size);
-
-      const response = await fetch(
-        "https://gif-converter.lijinhai255.workers.dev/api/gif-converter",
+const app = {
+  fetch: async (request, env, ctx) => {
+    return router.handle(request, { env, ctx }).catch((error) => {
+      console.error("Router error:", error);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Internal Server Error",
+          details: error.message,
+        }),
         {
-          method: "POST",
-          body: formData,
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders,
+          },
         }
       );
+    });
+  },
+};
 
-      console.log("Response status:", response.status);
+router.post("/api/gif-converter", async (request, { env }) => {
+  try {
+    console.log("Starting image processing");
 
-      const data = await response.json();
-      console.log("Response data:", data);
-
-      if (!response.ok) {
-        setDebug(data.debug || {});
-        throw new Error(data.details || `Server error: ${response.status}`);
-      }
-
-      if (data.success && data.image) {
-        setImageUrl(data.image);
-        setDebug(data.debug || {});
-      } else {
-        throw new Error("Invalid response format");
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      setError(error.message);
-    } finally {
-      setIsLoading(false);
+    if (!env?.MY_BUCKET) {
+      throw new Error("R2 bucket not configured");
     }
-  };
 
-  return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Image Converter Test</h1>
+    // 创建测试图片数据
+    const imageData = createTestImageData();
+    console.log("Created test image data, size:", imageData.length);
 
-      <button
-        onClick={convertImage}
-        disabled={isLoading}
-        className="bg-blue-500 text-white px-4 py-2 rounded mb-4 disabled:bg-gray-400"
-      >
-        {isLoading ? "Processing..." : "Test Conversion"}
-      </button>
+    // 保存到 R2
+    const outputName = "public/test-output.gif";
+    await env.MY_BUCKET.put(outputName, imageData, {
+      httpMetadata: {
+        contentType: "image/gif",
+      },
+    });
+    console.log("Image saved to R2");
 
-      {error && (
-        <div className="text-red-500 mb-4 p-4 bg-red-50 rounded">
-          <div className="font-bold">Error:</div>
-          <div>{error}</div>
-        </div>
-      )}
+    // 转换为 base64
+    const base64Data = btoa(String.fromCharCode.apply(null, imageData));
 
-      {debug && (
-        <div className="mb-4 p-4 bg-gray-50 rounded">
-          <div className="font-bold">Debug Info:</div>
-          <pre className="whitespace-pre-wrap">
-            {JSON.stringify(debug, null, 2)}
-          </pre>
-        </div>
-      )}
+    return new Response(
+      JSON.stringify({
+        success: true,
+        image: `data:image/gif;base64,${base64Data}`,
+        debug: {
+          imageInfo: {
+            type: "image/gif",
+            size: imageData.length,
+            name: outputName,
+          },
+          bytesProcessed: imageData.length,
+        },
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
+  } catch (error) {
+    console.error("Image processing failed:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Image processing failed",
+        details: error.message,
+        debug: {
+          timestamp: new Date().toISOString(),
+          errorType: error.constructor.name,
+          requestMethod: request.method,
+          contentType: request.headers.get("content-type"),
+        },
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
+  }
+});
 
-      {imageUrl && (
-        <div>
-          <h2 className="text-xl font-bold mb-2">Processed Image:</h2>
-          <img
-            src={imageUrl}
-            alt="Processed"
-            className="w-96 border-2 border-gray-300 rounded"
-            onError={(e) => {
-              console.error("Image load error");
-              setError("Failed to load processed image");
-            }}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
+router.options("*", () => {
+  return new Response(null, {
+    headers: {
+      ...corsHeaders,
+      "Access-Control-Allow-Headers": "Content-Type, Accept",
+    },
+  });
+});
+
+export default app;

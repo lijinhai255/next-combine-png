@@ -12,18 +12,15 @@ export default function Home() {
       setError(null);
       setDebug(null);
 
-      // 创建测试数据
-      const testBlob = new Blob(["test data"], { type: "image/png" });
-      const formData = new FormData();
-      formData.append("image", testBlob, "test.png");
-
       console.log("Sending request...");
 
       const response = await fetch(
         "https://gif-converter.lijinhai255.workers.dev/api/gif-converter",
         {
           method: "POST",
-          body: formData,
+          headers: {
+            Accept: "application/json",
+          },
         }
       );
 
@@ -82,7 +79,28 @@ export default function Home() {
       {imageUrl && (
         <div>
           <h2 className="text-xl font-bold mb-2">Processed Image:</h2>
-          <img src={imageUrl} alt="Processed" className="w-96" />
+          <img
+            src={imageUrl}
+            alt="Processed"
+            className="w-96 border-2 border-gray-300 rounded"
+            style={{
+              imageRendering: "pixelated",
+              width: "100px",
+              height: "100px",
+              backgroundColor: "#f0f0f0",
+            }}
+            onError={(e) => {
+              console.error("Image load error:", e);
+              setError("Failed to load processed image");
+            }}
+          />
+        </div>
+      )}
+
+      {imageUrl && (
+        <div className="mt-4">
+          <div className="font-bold">Image URL:</div>
+          <div className="break-all bg-gray-50 p-2 rounded">{imageUrl}</div>
         </div>
       )}
     </div>
