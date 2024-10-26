@@ -12,6 +12,7 @@
     "@napi-rs/canvas": "^0.1.44",
     "canvas": "^2.11.2",
     "gif-encoder-2": "^1.0.5",
+    "gif.js": "^0.2.0",
     "gifenc": "^1.0.3",
     "itty-router": "^3.0.12",
     "next": "13.4.19",

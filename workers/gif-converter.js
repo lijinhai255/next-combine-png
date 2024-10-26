@@ -1,68 +1,173 @@
 import { Router } from "itty-router";
-import { GIF } from "gifenc";
 
 const router = Router();
+const CLOUDFLARE_ACCOUNT_ID = "your-account-id"; // 需要替换成你的账号ID
+const API_TOKEN = "RY1ZaXwiKjk2YVRB2-MYXbEIY3woB_nw-VotPGKK";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Accept",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-// 创建GIF
-router.get("/api/create-gif", async (request, { env }) => {
+// 上传图片到 Cloudflare Images
+router.post("/api/upload", async (request) => {
   try {
-    if (!env?.MY_BUCKET) {
-      throw new Error("R2 bucket not configured");
+    const formData = await request.formData();
+    const file = formData.get("file");
+
+    if (!file) {
+      throw new Error("No file provided");
     }
 
-    // 列出所有图片
-    const listed = await env.MY_BUCKET.list({ prefix: "public/" });
-    const images = [];
-
-    // 获取所有图片数据
-    for (const object of listed.objects) {
-      const imageObject = await env.MY_BUCKET.get(object.key);
-      if (imageObject) {
-        const arrayBuffer = await imageObject.arrayBuffer();
-        const response = new Response(arrayBuffer);
-        const blob = await response.blob();
-        images.push({
-          data: blob,
-          delay: 500, // 每帧延迟500ms
-        });
+    // 创建上传URL请求
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1/direct_upload`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          requireSignedURLs: false,
+          metadata: {
+            file: file.name,
+          },
+        }),
       }
+    );
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.errors[0]?.message || "Failed to get upload URL");
     }
 
-    // 创建GIF编码器
-    const gif = GIF.create({
-      width: 800, // GIF宽度
-      height: 600, // GIF高度
-      quality: 10, // 质量
-      repeat: 0, // 循环次数 (0 = 无限循环)
+    // 上传图片
+    const uploadResponse = await fetch(data.result.uploadURL, {
+      method: "POST",
+      body: file,
     });
 
-    // 添加每一帧
-    for (const image of images) {
-      const imageData = await createImageBitmap(image.data);
-      const canvas = new OffscreenCanvas(800, 600);
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(imageData, 0, 0, 800, 600);
-      const frameData = ctx.getImageData(0, 0, 800, 600);
-
-      gif.addFrame(frameData.data, { delay: image.delay });
+    if (!uploadResponse.ok) {
+      throw new Error("Failed to upload image");
     }
 
-    // 完成GIF编码
-    const gifData = gif.finish();
+    return new Response(
+      JSON.stringify({
+        success: true,
+        imageId: data.result.id,
+        url: `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_ID}/${data.result.id}/public`,
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
+  }
+});
 
-    // 返回GIF数据
-    return new Response(gifData, {
-      headers: {
-        "Content-Type": "image/gif",
-        ...corsHeaders,
-      },
-    });
+// 获取图片列表
+router.get("/api/images", async () => {
+  try {
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1`,
+      {
+        headers: {
+          Authorization: `Bearer ${API_TOKEN}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.errors[0]?.message || "Failed to fetch images");
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        images: data.result.images.map((image) => ({
+          id: image.id,
+          url: `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_ID}/${image.id}/public`,
+          uploaded: image.uploaded,
+          filename: image.filename,
+        })),
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
+  }
+});
+
+// 删除图片
+router.delete("/api/images/:id", async (request) => {
+  try {
+    const { id } = request.params;
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1/${id}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${API_TOKEN}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.errors[0]?.message || "Failed to delete image");
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: "Image deleted successfully",
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
   } catch (error) {
     return new Response(
       JSON.stringify({
@@ -82,15 +187,10 @@ router.get("/api/create-gif", async (request, { env }) => {
 
 router.options("*", () => {
   return new Response(null, {
-    headers: {
-      ...corsHeaders,
-      "Access-Control-Allow-Headers": "Content-Type, Accept",
-    },
+    headers: corsHeaders,
   });
 });
 
 export default {
-  async fetch(request, env, ctx) {
-    return router.handle(request, { env, ctx });
-  },
+  fetch: router.handle,
 };
