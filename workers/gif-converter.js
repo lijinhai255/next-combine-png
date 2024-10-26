@@ -8,93 +8,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Accept",
 };
 
-// 获取单个图片
-router.get("/api/images/:filename", async (request, { env }) => {
-  try {
-    if (!env?.MY_BUCKET) {
-      throw new Error("R2 bucket not configured");
-    }
-
-    const { filename } = request.params;
-    const imagePath = `public/${filename}`;
-
-    const object = await env.MY_BUCKET.get(imagePath);
-    if (!object) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Image not found",
-        }),
-        {
-          status: 404,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
-    }
-
-    // 获取图片数据并转换为base64
-    const arrayBuffer = await object.arrayBuffer();
-    const base64Data = btoa(
-      String.fromCharCode.apply(null, new Uint8Array(arrayBuffer))
-    );
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        image: `data:${object.httpMetadata.contentType};base64,${base64Data}`,
-      }),
-      {
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
-      }
-    );
-  } catch (error) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-      }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
-      }
-    );
-  }
-});
-
 // 获取所有图片
 router.get("/api/images", async (request, { env }) => {
   try {
-    if (!env?.MY_BUCKET) {
-      throw new Error("R2 bucket not configured");
-    }
-
-    const imageNames = ["image1.png", "image2.png", "image3.png"];
+    const imageIds = ["image1", "image2", "image3"]; // 图片ID列表
     const images = [];
 
-    for (const filename of imageNames) {
-      const imagePath = `public/${filename}`;
-      const object = await env.MY_BUCKET.get(imagePath);
-
-      if (object) {
-        const arrayBuffer = await object.arrayBuffer();
-        const base64Data = btoa(
-          String.fromCharCode.apply(null, new Uint8Array(arrayBuffer))
-        );
-
-        images.push({
-          name: filename,
-          url: `data:${object.httpMetadata.contentType};base64,${base64Data}`,
-        });
-      }
+    for (const id of imageIds) {
+      const imageUrl = `https://imagedelivery.net/_BpKI42S7Xd9vwvkNdxbrA/${id}/public`;
+      images.push({
+        name: `${id}.png`,
+        url: imageUrl,
+      });
     }
 
     return new Response(
@@ -113,7 +38,8 @@ router.get("/api/images", async (request, { env }) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: "Failed to get images",
+        details: error.message,
       }),
       {
         status: 500,
@@ -126,7 +52,64 @@ router.get("/api/images", async (request, { env }) => {
   }
 });
 
-// 保留原有的其他路由...
+// 上传新图片
+router.post("/api/upload", async (request, { env }) => {
+  try {
+    const formData = await request.formData();
+    const image = formData.get("image");
+
+    if (!image) {
+      throw new Error("No image provided");
+    }
+
+    // 上传到 Cloudflare Images
+    const uploadResponse = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/ef96fca5011eaac8a774fcea0a71a67e/images/v1`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+        },
+        body: image,
+      }
+    );
+
+    const result = await uploadResponse.json();
+
+    if (!result.success) {
+      throw new Error(result.errors[0].message);
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        imageId: result.result.id,
+        imageUrl: `https://imagedelivery.net/_BpKI42S7Xd9vwvkNdxbrA/${result.result.id}/public`,
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Failed to upload image",
+        details: error.message,
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
+  }
+});
 
 router.options("*", () => {
   return new Response(null, {
@@ -137,4 +120,8 @@ router.options("*", () => {
   });
 });
 
-export default router;
+export default {
+  async fetch(request, env, ctx) {
+    return router.handle(request, { env, ctx });
+  },
+};
