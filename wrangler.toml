@@ -1,13 +1,15 @@
 name = "gif-converter"
-main = "./workers/gif-worker.js"
+main = "./workers/gif-converter.js"
 compatibility_date = "2023-10-26"
-compatibility_flags = ["nodejs_compat"]
+
+account_id = "ef96fca5011eaac8a774fcea0a71a67e" # Cloudflare 的 Account ID，可以在 Cloudflare Dashboard 中找到
 
 # R2 Bucket Bindings
+
 [[r2_buckets]]
-binding = "gif-converter"            # Worker 中使用的绑定名称
-bucket_name = "gif-converter"       # 你的 R2 存储桶名称
-preview_bucket_name = "gif-worker"
+binding = "MY_BUCKET"            # Worker 代码中使用的绑定名称（代码中引用 env.MY_BUCKET）
+bucket_name = "gif-converter"     # R2 存储桶的名称，应该为 `gif-converter`
+preview_bucket_name = "gif-converter" # 开发模式下使用的存储桶名称，通常与 bucket_name 保持一致
 
 [site]
 bucket = "./out"

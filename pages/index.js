@@ -19,7 +19,7 @@ export default function Home() {
 
       // 确保使用正确的 URL 和方法
       const response = await fetch(
-        "https://gif-converter.lijinhai255.workers.dev/api/create-gif",
+        "https://gif-converter.lijinhai255.workers.dev/api/gif-converter",
         {
           method: "POST",
           body: formData,
