@@ -1,14 +1,45 @@
 import { Router } from "itty-router";
 
 const router = Router();
-const CLOUDFLARE_ACCOUNT_ID = "ef96fca5011eaac8a774fcea0a71a67e"; // 替换为你的账号ID
+const CLOUDFLARE_ACCOUNT_ID = "ef96fca5011eaac8a774fcea0a71a67e";
 const API_TOKEN = "RY1ZaXwiKjk2YVRB2-MYXbEIY3woB_nw-VotPGKK";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Expose-Headers": "*",
 };
+
+// 获取直接访问URL
+async function getDirectUrl(imageId) {
+  try {
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1/${imageId}/token`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          timestamp: new Date().getTime() + 3600000,
+          expiry: Math.floor(Date.now() / 1000) + 3600,
+        }),
+      }
+    );
+
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error("Failed to get direct URL");
+    }
+
+    return `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_ID}/${imageId}/public?token=${data.result.token}`;
+  } catch (error) {
+    console.error("Error getting direct URL:", error);
+    throw error;
+  }
+}
 
 // 获取所有图片
 router.get("/api/images", async () => {
@@ -23,20 +54,27 @@ router.get("/api/images", async () => {
     );
 
     const data = await response.json();
-
     if (!data.success) {
-      throw new Error(data.errors[0]?.message || "Failed to fetch images");
+      throw new Error("Failed to fetch images");
     }
+
+    // 获取每张图片的直接访问URL
+    const images = await Promise.all(
+      data.result.images.map(async (image) => {
+        const directUrl = await getDirectUrl(image.id);
+        return {
+          id: image.id,
+          url: directUrl,
+          uploaded: image.uploaded,
+          filename: image.filename,
+        };
+      })
+    );
 
     return new Response(
       JSON.stringify({
         success: true,
-        images: data.result.images.map((image) => ({
-          id: image.id,
-          url: `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_ID}/${image.id}/public`,
-          uploaded: image.uploaded,
-          filename: image.filename,
-        })),
+        images,
       }),
       {
         headers: {
@@ -62,7 +100,7 @@ router.get("/api/images", async () => {
   }
 });
 
-// 上传新图片
+// 上传图片
 router.post("/api/upload", async (request) => {
   try {
     const formData = await request.formData();
@@ -72,7 +110,7 @@ router.post("/api/upload", async (request) => {
       throw new Error("No file provided");
     }
 
-    // 获取直接上传URL
+    // 获取上传URL
     const response = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1/direct_upload`,
       {
@@ -93,7 +131,7 @@ router.post("/api/upload", async (request) => {
     const data = await response.json();
 
     if (!data.success) {
-      throw new Error(data.errors[0]?.message || "Failed to get upload URL");
+      throw new Error("Failed to get upload URL");
     }
 
     // 上传图片
@@ -106,14 +144,15 @@ router.post("/api/upload", async (request) => {
       throw new Error("Failed to upload image");
     }
 
-    const uploadResult = await uploadResponse.json();
+    // 获取直接访问URL
+    const directUrl = await getDirectUrl(data.result.id);
 
     return new Response(
       JSON.stringify({
         success: true,
         image: {
           id: data.result.id,
-          url: `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_ID}/${data.result.id}/public`,
+          url: directUrl,
         },
       }),
       {
@@ -140,56 +179,7 @@ router.post("/api/upload", async (request) => {
   }
 });
 
-// 删除图片
-router.delete("/api/images/:id", async (request) => {
-  try {
-    const { id } = request.params;
-    const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1/${id}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${API_TOKEN}`,
-        },
-      }
-    );
-
-    const data = await response.json();
-
-    if (!data.success) {
-      throw new Error(data.errors[0]?.message || "Failed to delete image");
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Image deleted successfully",
-      }),
-      {
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
-      }
-    );
-  } catch (error) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-      }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
-      }
-    );
-  }
-});
-
-// 创建GIF
+// 创建 GIF
 router.post("/api/create-gif", async (request) => {
   try {
     const { imageIds, delay = 500, quality = 80 } = await request.json();
@@ -219,15 +209,19 @@ router.post("/api/create-gif", async (request) => {
     );
 
     const data = await response.json();
+    console.log("GIF creation response:", data);
 
     if (!data.success) {
       throw new Error(data.errors[0]?.message || "Failed to create GIF");
     }
 
+    // 获取 GIF 的直接访问 URL
+    const gifUrl = await getDirectUrl(data.result.id);
+
     return new Response(
       JSON.stringify({
         success: true,
-        gifUrl: `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_ID}/${data.result.id}/public`,
+        gifUrl: gifUrl,
         gifId: data.result.id,
       }),
       {
@@ -238,6 +232,7 @@ router.post("/api/create-gif", async (request) => {
       }
     );
   } catch (error) {
+    console.error("GIF creation error:", error);
     return new Response(
       JSON.stringify({
         success: false,
@@ -257,7 +252,10 @@ router.post("/api/create-gif", async (request) => {
 // 处理预检请求
 router.options("*", () => {
   return new Response(null, {
-    headers: corsHeaders,
+    headers: {
+      ...corsHeaders,
+      "Access-Control-Max-Age": "86400",
+    },
   });
 });
 
