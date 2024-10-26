@@ -2,18 +2,16 @@
   "name": "next-combine-png",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "yarn@1.22.10",
   "scripts": {
     "dev": "next dev",
-    "build": "next build && next export",
+    "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "export": "next build && next export"  
   },
   "dependencies": {
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "gif-encoder-2": "^1.0.5",
-    "@napi-rs/canvas": "^0.1.44"
+    "next": "13.4.19",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "gif.js": "^0.2.0"
   }
 }
