@@ -1,29 +1,45 @@
 import { Router } from "itty-router";
 
 const router = Router();
-const CLOUDFLARE_ACCOUNT_ID = "ef96fca5011eaac8a774fcea0a71a67e";
-const API_TOKEN = "RY1ZaXwiKjk2YVRB2-MYXbEIY3woB_nw-VotPGKK";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "*",
-  "Access-Control-Expose-Headers": "*",
+// Environment variables should be set in your Cloudflare Workers configuration
+// const CLOUDFLARE_ACCOUNT_ID = env.CLOUDFLARE_ACCOUNT_ID;
+// const API_TOKEN = env.API_TOKEN;
+// const ALLOWED_ORIGINS = env.ALLOWED_ORIGINS.split(',');
+
+// Secure CORS configuration
+const getCorsHeaders = (request) => {
+  const origin = request.headers.get("Origin");
+  // Check if the origin is in your allowed origins list
+  // const isAllowedOrigin = ALLOWED_ORIGINS.includes(origin);
+
+  return {
+    "Access-Control-Allow-Origin": origin || "*", // In production, replace * with specific origins
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Expose-Headers": "Content-Length",
+  };
 };
 
-// 获取直接访问URL
-async function getDirectUrl(imageId) {
+// Utility function to validate image file types
+const isValidImageType = (file) => {
+  const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+  return validTypes.includes(file.type);
+};
+
+// Get signed URL with proper error handling
+async function getDirectUrl(imageId, env) {
   try {
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1/${imageId}/token`,
+      `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${imageId}/token`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${API_TOKEN}`,
+          Authorization: `Bearer ${env.API_TOKEN}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          timestamp: new Date().getTime() + 3600000,
+          // Set expiry to 1 hour from now
           expiry: Math.floor(Date.now() / 1000) + 3600,
         }),
       }
@@ -31,37 +47,39 @@ async function getDirectUrl(imageId) {
 
     const data = await response.json();
     if (!data.success) {
-      throw new Error("Failed to get direct URL");
+      throw new Error(data.errors?.[0]?.message || "Failed to get direct URL");
     }
 
-    return `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_ID}/${imageId}/public?token=${data.result.token}`;
+    return `https://imagedelivery.net/${env.CLOUDFLARE_ACCOUNT_ID}/${imageId}/public?token=${data.result.token}`;
   } catch (error) {
     console.error("Error getting direct URL:", error);
-    throw error;
+    throw new Error("Failed to generate image access URL");
   }
 }
 
-// 获取所有图片
-router.get("/api/images", async () => {
+// Get all images with pagination support
+router.get("/api/images", async (request, env) => {
   try {
+    const page = parseInt(request.query?.page) || 1;
+    const per_page = parseInt(request.query?.per_page) || 30;
+
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1`,
+      `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/images/v1?page=${page}&per_page=${per_page}`,
       {
         headers: {
-          Authorization: `Bearer ${API_TOKEN}`,
+          Authorization: `Bearer ${env.API_TOKEN}`,
         },
       }
     );
 
     const data = await response.json();
     if (!data.success) {
-      throw new Error("Failed to fetch images");
+      throw new Error(data.errors?.[0]?.message || "Failed to fetch images");
     }
 
-    // 获取每张图片的直接访问URL
     const images = await Promise.all(
       data.result.images.map(async (image) => {
-        const directUrl = await getDirectUrl(image.id);
+        const directUrl = await getDirectUrl(image.id, env);
         return {
           id: image.id,
           url: directUrl,
@@ -75,11 +93,16 @@ router.get("/api/images", async () => {
       JSON.stringify({
         success: true,
         images,
+        pagination: {
+          current_page: page,
+          total_pages: Math.ceil(data.result.total_count / per_page),
+          total_count: data.result.total_count,
+        },
       }),
       {
         headers: {
           "Content-Type": "application/json",
-          ...corsHeaders,
+          ...getCorsHeaders(request),
         },
       }
     );
@@ -87,21 +110,21 @@ router.get("/api/images", async () => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: "Failed to fetch images",
       }),
       {
         status: 500,
         headers: {
           "Content-Type": "application/json",
-          ...corsHeaders,
+          ...getCorsHeaders(request),
         },
       }
     );
   }
 });
 
-// 上传图片
-router.post("/api/upload", async (request) => {
+// Upload image with validation
+router.post("/api/upload", async (request, env) => {
   try {
     const formData = await request.formData();
     const file = formData.get("file");
@@ -110,31 +133,42 @@ router.post("/api/upload", async (request) => {
       throw new Error("No file provided");
     }
 
-    // 获取上传URL
+    if (!isValidImageType(file)) {
+      throw new Error(
+        "Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed."
+      );
+    }
+
+    // Set maximum file size (e.g., 10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      throw new Error("File size exceeds maximum limit of 10MB");
+    }
+
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1/direct_upload`,
+      `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/images/v1/direct_upload`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${API_TOKEN}`,
+          Authorization: `Bearer ${env.API_TOKEN}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           requireSignedURLs: false,
           metadata: {
-            file: file.name,
+            filename: file.name,
+            filesize: file.size,
+            filetype: file.type,
           },
         }),
       }
     );
 
     const data = await response.json();
-
     if (!data.success) {
-      throw new Error("Failed to get upload URL");
+      throw new Error(data.errors?.[0]?.message || "Failed to get upload URL");
     }
 
-    // 上传图片
     const uploadResponse = await fetch(data.result.uploadURL, {
       method: "POST",
       body: file,
@@ -144,8 +178,7 @@ router.post("/api/upload", async (request) => {
       throw new Error("Failed to upload image");
     }
 
-    // 获取直接访问URL
-    const directUrl = await getDirectUrl(data.result.id);
+    const directUrl = await getDirectUrl(data.result.id, env);
 
     return new Response(
       JSON.stringify({
@@ -158,7 +191,7 @@ router.post("/api/upload", async (request) => {
       {
         headers: {
           "Content-Type": "application/json",
-          ...corsHeaders,
+          ...getCorsHeaders(request),
         },
       }
     );
@@ -172,15 +205,15 @@ router.post("/api/upload", async (request) => {
         status: 500,
         headers: {
           "Content-Type": "application/json",
-          ...corsHeaders,
+          ...getCorsHeaders(request),
         },
       }
     );
   }
 });
 
-// 创建 GIF
-router.post("/api/create-gif", async (request) => {
+// Create GIF with input validation
+router.post("/api/create-gif", async (request, env) => {
   try {
     const { imageIds, delay = 500, quality = 80 } = await request.json();
 
@@ -188,13 +221,24 @@ router.post("/api/create-gif", async (request) => {
       throw new Error("Please select at least 2 images");
     }
 
-    // 创建 GIF
+    if (imageIds.length > 50) {
+      throw new Error("Maximum 50 images allowed for GIF creation");
+    }
+
+    if (delay < 100 || delay > 5000) {
+      throw new Error("Delay must be between 100ms and 5000ms");
+    }
+
+    if (quality < 1 || quality > 100) {
+      throw new Error("Quality must be between 1 and 100");
+    }
+
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1/animate`,
+      `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/images/v1/animate`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${API_TOKEN}`,
+          Authorization: `Bearer ${env.API_TOKEN}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -209,14 +253,11 @@ router.post("/api/create-gif", async (request) => {
     );
 
     const data = await response.json();
-    console.log("GIF creation response:", data);
-
     if (!data.success) {
-      throw new Error(data.errors[0]?.message || "Failed to create GIF");
+      throw new Error(data.errors?.[0]?.message || "Failed to create GIF");
     }
 
-    // 获取 GIF 的直接访问 URL
-    const gifUrl = await getDirectUrl(data.result.id);
+    const gifUrl = await getDirectUrl(data.result.id, env);
 
     return new Response(
       JSON.stringify({
@@ -227,12 +268,11 @@ router.post("/api/create-gif", async (request) => {
       {
         headers: {
           "Content-Type": "application/json",
-          ...corsHeaders,
+          ...getCorsHeaders(request),
         },
       }
     );
   } catch (error) {
-    console.error("GIF creation error:", error);
     return new Response(
       JSON.stringify({
         success: false,
@@ -242,23 +282,23 @@ router.post("/api/create-gif", async (request) => {
         status: 500,
         headers: {
           "Content-Type": "application/json",
-          ...corsHeaders,
+          ...getCorsHeaders(request),
         },
       }
     );
   }
 });
 
-// 处理预检请求
-router.options("*", () => {
+// Handle preflight requests
+router.options("*", (request) => {
   return new Response(null, {
     headers: {
-      ...corsHeaders,
+      ...getCorsHeaders(request),
       "Access-Control-Max-Age": "86400",
     },
   });
 });
 
 export default {
-  fetch: router.handle,
+  fetch: (request, env, ctx) => router.handle(request, env, ctx),
 };
