@@ -14,9 +14,10 @@ export default function Home() {
       for (let i = 1; i <= 3; i++) {
         const response = await fetch(`/image${i}.png`);
         const blob = await response.blob();
-        formData.append("images", blob);
+        formData.append("images", blob, `image${i}.png`);
       }
 
+      // 确保使用正确的 URL 和方法
       const response = await fetch(
         "https://gif-converter.lijinhai255.workers.dev/api/create-gif",
         {
@@ -26,15 +27,14 @@ export default function Home() {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to create GIF");
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      setGifUrl(
-        `https://gif-converter.lijinhai255.workers.dev/gif/${data.gifId}`
-      );
+      const data = await response.blob();
+      const url = URL.createObjectURL(data);
+      setGifUrl(url);
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error creating GIF:", error);
     } finally {
       setIsLoading(false);
     }
