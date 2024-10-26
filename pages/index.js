@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
+  const [imageUrl, setImageUrl] = useState(null);
   const [error, setError] = useState(null);
+  const [debug, setDebug] = useState(null);
+  const [imageStats, setImageStats] = useState(null);
   const [images, setImages] = useState([]);
   const [isLoadingImages, setIsLoadingImages] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState(null);
 
   const fetchImages = async () => {
     try {
@@ -41,83 +43,17 @@ export default function Home() {
     }
   };
 
-  // 处理文件上传
-  const handleUpload = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsLoading(true);
-      setError(null);
-      setUploadStatus("uploading");
-
-      const formData = new FormData();
-      formData.append("image", file);
-
-      const response = await fetch(
-        "https://gif-converter.lijinhai255.workers.dev/api/upload",
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || `Server error: ${response.status}`);
-      }
-
-      if (data.success) {
-        setUploadStatus("success");
-        // 刷新图片列表
-        await fetchImages();
-      } else {
-        throw new Error("Upload failed");
-      }
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      setError(error.message);
-      setUploadStatus("error");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchImages();
   }, []);
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Image Gallery</h1>
+      <h1 className="text-3xl font-bold mb-6">Image Converter Test</h1>
 
-      {/* 上传按钮 */}
+      {/* 原始图片展示区域 */}
       <div className="mb-8">
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleUpload}
-          disabled={isLoading}
-          className="hidden"
-          id="image-upload"
-        />
-        <label
-          htmlFor="image-upload"
-          className={`inline-block px-6 py-3 rounded-lg cursor-pointer
-            ${isLoading ? "bg-gray-400" : "bg-blue-500 hover:bg-blue-600"}
-            text-white transition-colors`}
-        >
-          {isLoading ? "Uploading..." : "Upload Image"}
-        </label>
-        {uploadStatus === "success" && (
-          <span className="ml-4 text-green-600">Upload successful!</span>
-        )}
-      </div>
-
-      {/* 图片展示区域 */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold mb-4">Images:</h2>
+        <h2 className="text-2xl font-semibold mb-4">Original Images:</h2>
         {isLoadingImages ? (
           <div className="text-gray-600">Loading images...</div>
         ) : (
