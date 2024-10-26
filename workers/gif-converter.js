@@ -8,50 +8,115 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Accept",
 };
 
-// 最小的有效 1x1 像素红色 GIF 文件的十六进制数据
-const MINIMAL_GIF = new Uint8Array([
-  0x47,
-  0x49,
-  0x46,
-  0x38,
-  0x39,
-  0x61, // header "GIF89a"
-  0x01,
-  0x00,
-  0x01,
-  0x00, // width=1, height=1
-  0xf0, // Global Color Table
-  0xff,
-  0x00,
-  0x00, // RGB Red color
-  0x00,
-  0x00,
-  0x00, // RGB Black color
-  0x2c,
-  0x00,
-  0x00,
-  0x00,
-  0x00, // Image Descriptor
-  0x01,
-  0x00,
-  0x01,
-  0x00, // Image size
-  0x00, // No local color table
-  0x02,
-  0x02,
-  0x44,
-  0x01,
-  0x00, // Image data
-]);
+// 创建一个 10x10 彩色 GIF 动画
+function createColorfulGif() {
+  const header = [
+    0x47,
+    0x49,
+    0x46,
+    0x38,
+    0x39,
+    0x61, // GIF89a
+    0x0a,
+    0x00,
+    0x0a,
+    0x00, // width=10, height=10
+    0xf0,
+    0x00,
+    0x00, // Global Color Table follows
+    // Color Table (8 colors)
+    0xff,
+    0x00,
+    0x00, // Red
+    0x00,
+    0xff,
+    0x00, // Green
+    0x00,
+    0x00,
+    0xff, // Blue
+    0xff,
+    0xff,
+    0x00, // Yellow
+    0xff,
+    0x00,
+    0xff, // Magenta
+    0x00,
+    0xff,
+    0xff, // Cyan
+    0xff,
+    0xff,
+    0xff, // White
+    0x00,
+    0x00,
+    0x00, // Black
+  ];
 
-// 安全的 base64 编码函数
-function safeBase64Encode(buffer) {
-  let binary = "";
-  const bytes = new Uint8Array(buffer);
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
+  const graphicControl = [
+    0x21,
+    0xf9, // Graphic Control Extension
+    0x04, // 4 bytes follow
+    0x00, // No transparency
+    0x32,
+    0x00, // Delay time (50ms)
+    0x00, // No transparent color
+    0x00, // Block terminator
+  ];
+
+  const imageDescriptor = [
+    0x2c, // Image separator
+    0x00,
+    0x00,
+    0x00,
+    0x00, // Left, Top
+    0x0a,
+    0x00,
+    0x0a,
+    0x00, // Width, Height
+    0x00, // No local color table
+  ];
+
+  // 创建图像数据
+  const imageData = [
+    0x02, // LZW min code size
+    0x16,
+    0x8c,
+    0x2d,
+    0x99,
+    0x87,
+    0x2a,
+    0x1c,
+    0xdc,
+    0x33,
+    0xa0,
+    0x02,
+    0x75,
+    0xec,
+    0x95,
+    0xfa,
+    0xa8,
+    0xde,
+    0x60,
+    0x8c,
+    0x04,
+    0x91,
+    0x4c,
+    0x01,
+    0x00, // Block terminator
+  ];
+
+  // 文件结束标记
+  const trailer = [0x3b];
+
+  // 合并所有部分
+  const gifData = new Uint8Array([
+    ...header,
+    ...graphicControl,
+    ...imageDescriptor,
+    ...imageData,
+    ...trailer,
+  ]);
+
+  return gifData;
 }
 
 const app = {
@@ -78,28 +143,28 @@ const app = {
 
 router.post("/api/gif-converter", async (request, { env }) => {
   try {
-    console.log("Starting image processing");
+    console.log("Starting GIF creation");
 
     if (!env?.MY_BUCKET) {
       throw new Error("R2 bucket not configured");
     }
 
-    // 使用预定义的最小 GIF 数据
-    const imageData = MINIMAL_GIF;
-    console.log("Using minimal GIF, size:", imageData.length, "bytes");
+    // 创建彩色 GIF
+    const gifData = createColorfulGif();
+    console.log("Created GIF data, size:", gifData.length, "bytes");
 
     // 保存到 R2
     const outputName = "public/test-output.gif";
-    await env.MY_BUCKET.put(outputName, imageData, {
+    await env.MY_BUCKET.put(outputName, gifData, {
       httpMetadata: {
         contentType: "image/gif",
       },
     });
-    console.log("Image saved to R2");
+    console.log("Saved GIF to R2");
 
     // 转换为 base64
-    const base64Data = safeBase64Encode(imageData);
-    console.log("Base64 length:", base64Data.length);
+    const base64Data = btoa(String.fromCharCode.apply(null, gifData));
+    console.log("Base64 encoding complete, length:", base64Data.length);
 
     return new Response(
       JSON.stringify({
@@ -108,10 +173,11 @@ router.post("/api/gif-converter", async (request, { env }) => {
         debug: {
           imageInfo: {
             type: "image/gif",
-            size: imageData.length,
+            size: gifData.length,
             name: outputName,
+            dimensions: "10x10",
           },
-          bytesProcessed: imageData.length,
+          bytesProcessed: gifData.length,
           base64Length: base64Data.length,
         },
       }),
@@ -123,11 +189,11 @@ router.post("/api/gif-converter", async (request, { env }) => {
       }
     );
   } catch (error) {
-    console.error("Image processing failed:", error);
+    console.error("GIF creation failed:", error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: "Image processing failed",
+        error: "GIF creation failed",
         details: error.message,
         debug: {
           timestamp: new Date().toISOString(),
