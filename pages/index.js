@@ -37,7 +37,9 @@ export default function Home() {
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch("/api/images");
+        const response = await fetch(
+          "https://gif-converter.lijinhai255.workers.dev/api/images"
+        );
         const data = await response.json();
 
         if (!data.success) {
@@ -94,10 +96,13 @@ export default function Home() {
 
         setUploadProgress((prev) => ({ ...prev, [file.name]: 0 }));
 
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
+        const response = await fetch(
+          "https://gif-converter.lijinhai255.workers.dev/api/upload",
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
 
         const data = await response.json();
 
@@ -122,9 +127,12 @@ export default function Home() {
     if (!window.confirm("Are you sure you want to delete this image?")) return;
 
     try {
-      const response = await fetch(`/api/images/${imageId}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `https://gif-converter.lijinhai255.workers.dev/api/images/${imageId}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       const data = await response.json();
 
@@ -173,16 +181,19 @@ export default function Home() {
       setError(null);
       setGifUrl(null);
 
-      const response = await fetch("/api/create-gif", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageIds: selectedImages,
-          ...gifSettings,
-        }),
-      });
+      const response = await fetch(
+        "https://gif-converter.lijinhai255.workers.dev/api/create-gif",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            imageIds: selectedImages,
+            ...gifSettings,
+          }),
+        }
+      );
 
       const data = await response.json();
 
