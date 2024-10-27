@@ -8,6 +8,7 @@ import {
   Trash2,
   Settings,
 } from "lucide-react";
+import { ENDPOINTS, formatError } from "../utils/api";
 
 export default function Home() {
   const [images, setImages] = useState([]);
@@ -37,9 +38,7 @@ export default function Home() {
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch(
-          "https://gif-converter.lijinhai255.workers.dev/api/images"
-        );
+        const response = await fetch(ENDPOINTS.images);
         const data = await response.json();
 
         if (!data.success) {
@@ -96,13 +95,10 @@ export default function Home() {
 
         setUploadProgress((prev) => ({ ...prev, [file.name]: 0 }));
 
-        const response = await fetch(
-          "https://gif-converter.lijinhai255.workers.dev/api/upload",
-          {
-            method: "POST",
-            body: formData,
-          }
-        );
+        const response = await fetch(ENDPOINTS.upload, {
+          method: "POST",
+          body: formData,
+        });
 
         const data = await response.json();
 
@@ -127,12 +123,9 @@ export default function Home() {
     if (!window.confirm("Are you sure you want to delete this image?")) return;
 
     try {
-      const response = await fetch(
-        `https://gif-converter.lijinhai255.workers.dev/api/images/${imageId}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const response = await fetch(`${ENDPOINTS.images}/${imageId}`, {
+        method: "DELETE",
+      });
 
       const data = await response.json();
 
@@ -181,19 +174,16 @@ export default function Home() {
       setError(null);
       setGifUrl(null);
 
-      const response = await fetch(
-        "https://gif-converter.lijinhai255.workers.dev/api/create-gif",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            imageIds: selectedImages,
-            ...gifSettings,
-          }),
-        }
-      );
+      const response = await fetch(ENDPOINTS.createGif, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          imageIds: selectedImages,
+          ...gifSettings,
+        }),
+      });
 
       const data = await response.json();
 

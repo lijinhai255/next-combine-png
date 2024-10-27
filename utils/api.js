@@ -1,12 +1,10 @@
 /**
  * API 基础路径
- * 在开发环境和生产环境都使用相对路径,让 Next.js 处理代理
  */
 const API_BASE = "/api";
 
 /**
  * API 端点配置
- * 所有的 API 路由都在这里集中管理
  * @type {{
  *   images: string,
  *   upload: string,
@@ -20,12 +18,17 @@ export const ENDPOINTS = {
 };
 
 /**
- * 标准响应类型
- * @typedef {Object} ApiResponse
- * @property {boolean} success - 请求是否成功
- * @property {any} [data] - 响应数据
- * @property {string} [error] - 错误信息
+ * 处理 API 错误
+ * @param {Error} error - 错误对象
+ * @param {string} [fallback] - 默认错误信息
+ * @returns {string} 格式化的错误信息
  */
+export const formatError = (
+  error,
+  fallback = "An unexpected error occurred"
+) => {
+  return error?.message || fallback;
+};
 
 /**
  * 通用请求头
@@ -35,10 +38,14 @@ export const DEFAULT_HEADERS = {
 };
 
 /**
- * 处理 API 错误的工具函数
- * @param {Error} error - 错误对象
- * @returns {string} 格式化的错误信息
+ * 检查响应状态
+ * @param {Response} response - Fetch API 响应对象
+ * @throws {Error} 当响应状态不是 2xx 时抛出错误
  */
-export const formatError = (error) => {
-  return error?.message || "An unexpected error occurred";
+export const checkResponse = async (response) => {
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || `HTTP error! status: ${response.status}`);
+  }
+  return response.json();
 };
