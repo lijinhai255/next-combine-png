@@ -1,3 +1,13 @@
+// pages/api/upload.js
+import formidable from "formidable";
+import { createReadStream } from "fs";
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res
@@ -5,16 +15,29 @@ export default async function handler(req, res) {
       .json({ success: false, error: "Method not allowed" });
   }
 
-  try {
-    const formData = await req.formData();
-    const file = formData.get("file");
+  // Set CORS headers
+  res.setHeader("Access-Control-Allow-Credentials", true);
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST");
+  res.setHeader("Access-Control-Allow-Headers", "*");
 
+  const form = formidable({ multiples: true });
+
+  try {
+    const [fields, files] = await new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) reject(err);
+        resolve([fields, files]);
+      });
+    });
+
+    const file = files.file;
     if (!file) {
-      throw new Error("No file provided");
+      throw new Error("No file uploaded");
     }
 
-    // Get upload URL
-    const response = await fetch(
+    // Get upload URL from Cloudflare
+    const uploadUrlResponse = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/direct_upload`,
       {
         method: "POST",
@@ -28,37 +51,35 @@ export default async function handler(req, res) {
       }
     );
 
-    const data = await response.json();
-    if (!data.success) {
+    const uploadUrlData = await uploadUrlResponse.json();
+    if (!uploadUrlData.success) {
       throw new Error("Failed to get upload URL");
     }
 
-    // Upload image
-    const uploadResponse = await fetch(data.result.uploadURL, {
+    // Upload the file to Cloudflare
+    const stream = createReadStream(file.filepath);
+    const uploadResponse = await fetch(uploadUrlData.result.uploadURL, {
       method: "POST",
-      body: file,
+      body: stream,
     });
 
     if (!uploadResponse.ok) {
-      throw new Error("Failed to upload image");
+      throw new Error("Failed to upload file to Cloudflare");
     }
 
-    // Get direct URL
-    const directUrl = await getDirectUrl(data.result.id);
+    // Get the direct URL
+    const directUrl = await getDirectUrl(uploadUrlData.result.id);
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       image: {
-        id: data.result.id,
+        id: uploadUrlData.result.id,
         url: directUrl,
       },
     });
   } catch (error) {
-    console.error("Error uploading image:", error);
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    console.error("Upload error:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 }
 
