@@ -1,2 +1,30 @@
-compatibility_flags = [ "nodejs_compat" ]
-pages_build_output_dir = ".vercel/output/static"
+name = "gif-converter"
+main = "./workers/gif-converter.js"
+compatibility_date = "2023-10-26"
+
+account_id = "ef96fca5011eaac8a774fcea0a71a67e"
+[vars]
+CLOUDFLARE_ACCOUNT_ID = "ef96fca5011eaac8a774fcea0a71a67e"
+API_TOKEN = "RY1ZaXwiKjk2YVRB2-MYXbEIY3woB_nw-VotPGKK"
+
+# R2 Bucket Configuration
+[[r2_buckets]]
+binding = "MY_BUCKET"
+bucket_name = "gif-converter"
+preview_bucket_name = "gif-converter"
+
+[site]
+bucket = "./out"
+
+[build]
+command = "npm run build"
+watch_dir = "workers"
+
+[dev]
+port = 8787
+local = false
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
