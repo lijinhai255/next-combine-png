@@ -9,7 +9,6 @@
     "pages:build": "npx @cloudflare/next-on-pages"
   },
   "dependencies": {
-    "@napi-rs/canvas": "^0.1.44",
     "canvas": "^2.11.2",
     "formidable": "^3.5.2",
     "gif-encoder-2": "^1.0.5",
