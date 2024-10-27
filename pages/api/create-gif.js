@@ -9,7 +9,7 @@ export const config = {
     bodyParser: true,
   },
 };
-
+export const runtime = "edge";
 export default async function handler(req, res) {
   console.log(req, res, "req, res-req, res");
   if (req.method !== "POST") {

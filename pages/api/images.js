@@ -1,4 +1,5 @@
 // pages/api/images.js
+export const runtime = "edge";
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader("Access-Control-Allow-Credentials", true);
