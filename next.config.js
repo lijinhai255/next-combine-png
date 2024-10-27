@@ -1,14 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
   images: {
     domains: ["imagedelivery.net"],
   },
-  async rewrites() {
+  async headers() {
     return [
       {
         source: "/api/:path*",
-        destination: "https://your-worker-url.workers.dev/api/:path*",
+        headers: [
+          { key: "Access-Control-Allow-Credentials", value: "true" },
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          {
+            key: "Access-Control-Allow-Methods",
+            value: "GET,POST,DELETE,OPTIONS",
+          },
+          { key: "Access-Control-Allow-Headers", value: "*" },
+        ],
       },
     ];
   },
