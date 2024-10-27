@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "deploy:worker": "wrangler publish"
+    "pages:build": "npx @cloudflare/next-on-pages"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.44",
@@ -23,6 +23,7 @@
     "react-dom": "18.2.0"
   },
   "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.5",
     "wrangler": "^3.0.0"
   }
 }
