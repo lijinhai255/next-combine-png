@@ -1,30 +1,43 @@
-name = "gif-converter"
+name = "next-combine-png"  # 改成你当前的项目名
 main = "./workers/gif-converter.js"
 compatibility_date = "2023-10-26"
-
+compatibility_flags = ["nodejs_compat"]
 account_id = "ef96fca5011eaac8a774fcea0a71a67e"
+pages_build_output_dir = ".vercel/output/static"
+
+# 环境变量
 [vars]
 CLOUDFLARE_ACCOUNT_ID = "ef96fca5011eaac8a774fcea0a71a67e"
 API_TOKEN = "RY1ZaXwiKjk2YVRB2-MYXbEIY3woB_nw-VotPGKK"
 
-# R2 Bucket Configuration
+# R2 存储配置
 [[r2_buckets]]
 binding = "MY_BUCKET"
 bucket_name = "gif-converter"
 preview_bucket_name = "gif-converter"
 
+# 站点配置
 [site]
-bucket = "./out"
+bucket = "./public"  # 改为 Next.js 的公共目录
 
+# 构建配置
 [build]
 command = "npm run build"
-watch_dir = "workers"
+watch_dir = "src"  # 改为监视 src 目录
 
+# 开发配置
 [dev]
 port = 8787
 local = false
 
+# 可观察性配置
 [observability]
 enabled = true
 head_sampling_rate = 1
 
+# 环境配置
+[env.production]
+workers_dev = false
+
+[env.staging]
+workers_dev = true
