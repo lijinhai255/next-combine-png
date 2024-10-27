@@ -9,6 +9,8 @@
     "pages:build": "npx @cloudflare/next-on-pages"
   },
   "dependencies": {
+    "@aws-amplify/ui-react": "^6.5.5",
+    "aws-amplify": "^6.6.7",
     "canvas": "^2.11.2",
     "gif-encoder-2": "^1.0.5",
     "gif.js": "^0.2.0",
@@ -22,6 +24,7 @@
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.5",
+    "@types/react": "18.3.12",
     "wrangler": "^3.0.0"
   }
 }
