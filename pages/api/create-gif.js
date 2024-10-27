@@ -1,60 +1,81 @@
-// pages/api/create-gif.js
-import GIFEncoder from "gif-encoder-2"; // 注意这里改用了 gif-encoder-2
-import { createCanvas, loadImage } from "@napi-rs/canvas"; // 使用 @napi-rs/canvas 替代 canvas
-import fs from "fs";
-import path from "path";
-
-export const config = {
-  api: {
-    bodyParser: true,
-  },
-};
 export const runtime = "edge";
-export default async function handler(req, res) {
-  console.log(req, res, "req, res-req, res");
+
+export default async function handler(req) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
   }
 
   try {
-    const publicDir = path.join(process.cwd(), "public");
-    if (!fs.existsSync(publicDir)) {
-      fs.mkdirSync(publicDir, { recursive: true });
-    }
+    const { imageIds, delay = 500, quality = 80 } = await req.json();
 
-    const width = 400;
-    const height = 300;
-
-    const encoder = new GIFEncoder(width, height);
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext("2d");
-
-    const outputPath = path.join(publicDir, "output.gif");
-    const writeStream = fs.createWriteStream(outputPath);
-
-    encoder.createReadStream().pipe(writeStream);
-    encoder.start();
-    encoder.setDelay(500);
-    encoder.setQuality(10);
-    encoder.setRepeat(0);
-
-    const imageNames = ["image1.png", "image2.png", "image3.png"];
-
-    for (const imageName of imageNames) {
-      const imagePath = path.join(publicDir, imageName);
-      if (!fs.existsSync(imagePath)) {
-        return res.status(404).json({ error: `Image not found: ${imageName}` });
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/animate`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          imageIds,
+          options: {
+            delay,
+            loop: 0,
+            quality,
+          },
+        }),
       }
-      const image = await loadImage(imagePath);
-      ctx.drawImage(image, 0, 0, width, height);
-      encoder.addFrame(ctx);
+    );
+
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.errors?.[0]?.message || "Failed to create GIF");
     }
 
-    encoder.finish();
+    // 获取直接 URL
+    const directUrlResponse = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${data.result.id}/token`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          expiry: Math.floor(Date.now() / 1000) + 3600,
+        }),
+      }
+    );
 
-    return res.status(200).json({ success: true });
+    const tokenData = await directUrlResponse.json();
+    const gifUrl = `https://imagedelivery.net/${process.env.CLOUDFLARE_ACCOUNT_ID}/${data.result.id}/public?token=${tokenData.result.token}`;
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        gifUrl,
+        gifId: data.result.id,
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
   } catch (error) {
-    console.error("Error:", error);
-    return res.status(500).json({ error: error.message });
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
   }
 }
