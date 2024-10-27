@@ -1,50 +1,39 @@
-/**
- * API 基础路径
- */
-const API_BASE = "/api";
+// API 基础路径
+const API_BASE = ""; // 移除 /api 前缀，因为我们直接使用完整 URL
 
-/**
- * API 端点配置
- * @type {{
- *   images: string,
- *   upload: string,
- *   createGif: string
- * }}
- */
+// API 端点配置
 export const ENDPOINTS = {
-  images: `${API_BASE}/images`, // 获取图片列表
-  upload: `${API_BASE}/upload`, // 上传新图片
-  createGif: `${API_BASE}/create-gif`, // 创建 GIF
+  images: `/api/images`,
+  upload: `/api/upload`,
+  createGif: `/api/create-gif`,
 };
 
-/**
- * 处理 API 错误
- * @param {Error} error - 错误对象
- * @param {string} [fallback] - 默认错误信息
- * @returns {string} 格式化的错误信息
- */
+// 处理 API 错误
 export const formatError = (
   error,
   fallback = "An unexpected error occurred"
 ) => {
+  if (error?.message?.includes("<!DOCTYPE html>")) {
+    return "Server error occurred. Please try again.";
+  }
   return error?.message || fallback;
 };
 
-/**
- * 通用请求头
- */
+// 通用请求头
 export const DEFAULT_HEADERS = {
   "Content-Type": "application/json",
 };
 
-/**
- * 检查响应状态
- * @param {Response} response - Fetch API 响应对象
- * @throws {Error} 当响应状态不是 2xx 时抛出错误
- */
+// 检查响应状态
 export const checkResponse = async (response) => {
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
+    const text = await response.text();
+    let error;
+    try {
+      error = JSON.parse(text);
+    } catch {
+      throw new Error("Server error occurred");
+    }
     throw new Error(error.message || `HTTP error! status: ${response.status}`);
   }
   return response.json();
